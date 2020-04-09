@@ -7,47 +7,70 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
-import android.app.DownloadManager;
+import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
-import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
+
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.SignInButton;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
+import com.kakao.auth.IApplicationConfig;
+import com.kakao.auth.KakaoAdapter;
+import com.kakao.auth.KakaoSDK;
+
+import bridge.AndroidBridge;
 
 public class MainActivity extends AppCompatActivity {
 
     String TAG = "Main Activity";
     WebView contentWebView;
     private ValueCallback<Uri[]> mFilePathCallback;
+    private GoogleSignInClient mGoogleSignInClient;
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //KAKAO SDK Init
+//        KakaoSDK.init(new KakaoAdapter(){
+//            @Override
+//            public IApplicationConfig getApplicationConfig() {
+//                return new IApplicationConfig() {
+//                    @Override
+//                    public Context getApplicationContext() {
+//                        return MainActivity.this;
+//                    }
+//                };
+//            }
+//        });
+
         setContentView(R.layout.activity_main);
 
         CheckPermission();
+
         hideNavigationBar();
-        CreateWebView("http://www.uxfacdev.com:9001");
-
-
+        CreateWebView("http://192.168.1.101:3000/");
     }
 
     private void hideNavigationBar() {
@@ -66,10 +89,20 @@ public class MainActivity extends AppCompatActivity {
         getWindow().getDecorView().setSystemUiVisibility(newUiOptions);
     }
 
+    @Override
+    public void onBackPressed() {
+        if(contentWebView.canGoBack()){
+            contentWebView.goBack();
+        }else{
+            super.onBackPressed();
+        }
+    }
+
+
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void CreateWebView(String targetUrl) {
 
-        contentWebView = (WebView) findViewById(R.id.mywebview);
+        contentWebView = findViewById(R.id.mywebview);
 
         WebSettings webSettings = contentWebView.getSettings();
 
@@ -110,13 +143,12 @@ public class MainActivity extends AppCompatActivity {
 
                 startActivityForResult(intent, 0);
                 return true;
-
-
             }
 
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog,
                                           boolean isUserGesture, Message resultMsg) {
+
 
 
                 Log.i("MyCheck", "Oncreate");
@@ -153,6 +185,10 @@ public class MainActivity extends AppCompatActivity {
 //                cookieManager.removeAllCookie();
             }
 
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, final android.webkit.JsResult  result) {
+                return super.onJsAlert(view, url, message, result);
+            }
         });
 
         contentWebView.setWebViewClient(new WebViewClient() {
@@ -166,8 +202,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         contentWebView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        contentWebView.addJavascriptInterface(new myWebviewController(contentWebView), "android");
-
+        contentWebView.addJavascriptInterface(new myWebviewController(contentWebView, MainActivity.this), "android");
         contentWebView.loadUrl(targetUrl);
 
         Log.i("MyCheck", webSettings.getUserAgentString());
@@ -176,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
 
     private class myWebviewController {
         private WebView mWebView;
-
+        private Activity mContext;
         @JavascriptInterface
         public void requestImage(final String arg) {
             new Handler().post(new Runnable() {
@@ -187,8 +222,20 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        private myWebviewController(WebView mWebView) {
+        @JavascriptInterface
+        public void call_log2(final String str) {
+            new Handler().post(new Runnable() {
+                @Override
+                public void run() {
+                    Log.d("AndroidBridge", str);
+                    Log.d("AndroidBridge", "go to the SDK");
+                }
+            });
+        }
+
+        private myWebviewController(WebView mWebView, Activity mContext) {
             this.mWebView = mWebView;
+            this.mContext = mContext;
         }
     }
 
@@ -203,6 +250,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+
         Log.e("resultCode:: ", String.valueOf(resultCode));
 //        callbackManager.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 0 && resultCode == Activity.RESULT_OK) {
@@ -236,6 +284,7 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
+
     private static final int PERMISSION_REQUEST_STORAGE = 1;
     @TargetApi(Build.VERSION_CODES.M)
     private void checkPermission() {
@@ -247,4 +296,6 @@ public class MainActivity extends AppCompatActivity {
                     PERMISSION_REQUEST_STORAGE);
         }
     }
+
+
 }
